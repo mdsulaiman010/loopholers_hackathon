@@ -22,7 +22,7 @@ def calculate_angle(a, b, c):
     if degrees > 180.0:
         degrees = 360 - degrees
 
-    return degrees
+    return degrees 
 
 capture = cv2.VideoCapture(1)
 

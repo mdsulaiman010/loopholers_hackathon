@@ -1,5 +1,6 @@
 # Ignore .env files
 loopholers_env/
+.env
 
 # Ignore virtual environment files and directories
 pyvenv.cfg
@@ -86,3 +87,5 @@ __pycache__/
 
 # Ignore the site-packages directory
 loophole/Lib/site-packages/
+
+.DS_Store
