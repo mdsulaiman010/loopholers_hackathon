@@ -5,3 +5,4 @@ opencv-python==4.11.0.86
 elevenlabs==2.3.0
 numpy==1.26.4
 pandas==2.3.0
+jupyter==1.1.1
