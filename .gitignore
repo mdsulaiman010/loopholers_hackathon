@@ -1,4 +1,6 @@
-# Ignore Python virtual environments
+# Ignore .env files
+loopholers_env/
+
 # Ignore virtual environment files and directories
 pyvenv.cfg
 venv/
