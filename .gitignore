@@ -1,5 +1,4 @@
 # Ignore .env files
-# Ignore .env files
 loopholers_env/
 
 # Ignore virtual environment files and directories
