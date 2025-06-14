@@ -1,0 +1,43 @@
+# Ignore Python virtual environments
+# Ignore virtual environment files and directories
+pyvenv.cfg
+venv/
+loophole/
+
+# Ignore node_modules for Node.js projects
+node_modules/
+
+# Ignore log files
+*.log
+
+# Ignore Python bytecode
+*.py
+*.pyc
+__pycache__/
+
+# Ignore executable files
+*.exe
+
+# Ignore wheel, tar, and egg files
+*.whl
+*.tar.gz
+*.egg
+
+# Ignore template files
+*.tmpl
+
+# Ignore Windows Installer Files
+*.cab
+*.msi
+*.exe
+*.dll
+*.bak
+*.swp
+*.swo
+
+# Ignore Python package metadata and configurations
+*.dist-info/
+*.egg-info/
+
+# Ignore the site-packages directory
+loophole/Lib/site-packages/
