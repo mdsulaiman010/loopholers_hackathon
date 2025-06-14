@@ -3,10 +3,10 @@ import time
 import numpy as np
 
 
-def upload_and_process_video(file_path, display_name):
+def upload_and_process_video(file_path):
     print("Uploading video file...")
     try:
-        video_file = genai.upload_file(path=file_path, display_name=display_name, mime_type="video/mp4")
+        video_file = genai.upload_file(path=file_path, mime_type="video/mp4")
         print(f"Completed upload: {video_file.uri}")
 
         # Check the state of the uploaded file
@@ -25,9 +25,15 @@ def upload_and_process_video(file_path, display_name):
     
 def generate_content_from_video(video_file, prompt):
     try:
-        model = genai.GenerativeModel(model_name="gemini-1.5-flash")
+        model = genai.GenerativeModel(model_name="gemini-1.5-flash",)
         print("\nMaking LLM inference request...")
-        response = model.generate_content([video_file, prompt], request_options={"timeout": 600})
+        response = model.generate_content([video_file, prompt], 
+                                          request_options={"timeout": 600},
+                                          generation_config=genai.types.GenerationConfig(
+                                            temperature=0.7,
+                                            max_output_tokens=512  
+                                            )
+                                          )
         return response.text
     except Exception as e:
         print(f"Error generating content: {e}")

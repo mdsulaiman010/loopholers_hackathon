@@ -4,6 +4,7 @@ import numpy as np
 import mediapipe as mp
 import time
 import os 
+from datetime import datetime
 from dotenv import load_dotenv
 import google.generativeai as genai
 from utilities import upload_and_process_video, generate_content_from_video, calculate_angle
@@ -40,13 +41,19 @@ col1, col2 = st.columns(2)
 with col1: start_record = st.button('Start recording', key='start')
 with col2: stop_record = st.button('Stop recording', key='stop')
 
+if 'recordings' not in os.listdir():
+    os.mkdir('recordings')
+else:
+    print('Recordings log already established')
 
 # Initialize video capture with DroidCam
 if start_record:
     cap = cv2.VideoCapture(0)    # DROIDCAM_URL
+    full_video_fp = os.path.join('.', 'recordings', 
+                                 f'workout_recordings_{datetime.now().strftime("%d%m%Y_%H%M%S")}.mp4')
 
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')  # Or 'mp4v' | 'XVID' | 'avc1
-    out = cv2.VideoWriter('output.avi', fourcc, 20.0, (640, 480))
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Or 'mp4v' | 'XVID' | 'avc1
+    out = cv2.VideoWriter(full_video_fp, fourcc, 20.0, (640, 480))
 
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
         if not cap.isOpened():
@@ -132,12 +139,46 @@ if start_record:
                     st.session_state.recording = False
                     break
         cap.release()
+        st.session_state.completed_recording = True
 
 # AI Analysis Toggle
 st.header("AI Analysis Controls")
 ai_toggle = st.toggle("Toggle AI Analysis (10-15s)", value=False)
 if ai_toggle:
     st.write("AI is analyzing the live feed for 10-15 seconds...")
+    # Get latest recording from archive folder
+    latest_recording_fp = max(os.listdir('recordings'))
+
+    # Check if the file exists
+    if not os.path.exists(latest_recording_fp):
+        print(f"Video file {latest_recording_fp} not found.")
+
+    # Load in system prompt
+    with open('livefeed-sys-prompt.txt', 'r') as f:
+        system_prompt = f.read()
+
+    # Check if the file is already uploaded
+    try:
+        file_list = genai.list_files(page_size=100)
+        # video_file = next((f for f in file_list if f.display_name == display_name), None)
+
+        # if video_file:
+        #     print(f"Using existing file: {video_file.uri}")
+        # else:
+        video_file = upload_and_process_video(os.path.join('recordings', latest_recording_fp))
+
+        if video_file:
+            response_text = generate_content_from_video(video_file, system_prompt)
+
+            if response_text:
+                print("\nGenerated Response:")
+                print(response_text)
+            else:
+                print("Failed to generate response.")
+        else:
+            print("Failed to upload or process video.")
+    except Exception as e:
+        print(f"Error: {e}")
 
 # TTS Toggle
 st.header("Text-to-Speech Controls")
@@ -145,48 +186,13 @@ tts_toggle = st.toggle("Toggle TTS (AI Avatar Output)", value=False)
 if tts_toggle:
     st.write("DeepMotion avatar is reading out LLM output...")
 
+
 # DeepMotion Avatar Placeholder (Bottom Section)
 st.header("DeepMotion Avatar Feedback")
 if tts_toggle:
     st.write("Placeholder: DeepMotion avatar would display here with TTS output.")
 else:
     st.write("Placeholder: Avatar inactive.")
-
-
-video_file_path = "output.mp4"
-display_name = "sample_video"
-
-# Check if the file exists
-if not os.path.exists(video_file_path):
-    print(f"Video file {video_file_path} not found.")
-
-# Load in system prompt
-with open('livefeed-sys-prompt.txt', 'r') as f:
-    system_prompt = f.read()
-
-# Check if the file is already uploaded
-try:
-    file_list = genai.list_files(page_size=100)
-    video_file = next((f for f in file_list if f.display_name == display_name), None)
-
-    if video_file:
-        print(f"Using existing file: {video_file.uri}")
-    else:
-        video_file = upload_and_process_video(video_file_path, display_name)
-
-    if video_file:
-        response_text = generate_content_from_video(video_file, system_prompt)
-
-        if response_text:
-            print("\nGenerated Response:")
-            print(response_text)
-        else:
-            print("Failed to generate response.")
-    else:
-        print("Failed to upload or process video.")
-except Exception as e:
-    print(f"Error: {e}")
-
 
 
 # Release the capture when done (though Streamlit may not reach this in a running app)
