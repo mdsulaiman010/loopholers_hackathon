@@ -6,7 +6,7 @@ import time
 import os 
 from dotenv import load_dotenv
 import google.generativeai as genai
-from utils import upload_and_process_video, generate_content_from_video, calculate_angle
+from utilities import upload_and_process_video, generate_content_from_video, calculate_angle
 
 # Load relevant API keys
 load_dotenv('.env')
