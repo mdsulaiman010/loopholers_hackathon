@@ -34,12 +34,42 @@ if "1.5" in model_name:
 # Initialize Gemini model
 model = genai.GenerativeModel(model_name)
 
-# Session state for chat history
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# Sidebar to select or create a new chat session
+if 'sessions' not in st.session_state:
+    st.session_state.sessions = {}
 
-# Display chat history
-for msg in st.session_state.chat_history:
+session_name = st.sidebar.selectbox("Select a chat session", list(st.session_state.sessions.keys()) + ["Create New Session"])
+
+# Create a new session
+if session_name == "Create New Session":
+    new_session_name = st.sidebar.text_input("Enter a name for the new session")
+    if st.sidebar.button("Create Session"):
+        if new_session_name:
+            st.session_state.sessions[new_session_name] = []
+            session_name = new_session_name
+            st.sidebar.success(f"Session '{session_name}' created.")
+        else:
+            st.sidebar.error("Please enter a valid session name.")
+
+# Set the active session
+chat_history = st.session_state.sessions.get(session_name, [])
+
+# Custom message bubble style
+user_message_style = """
+    <div style="background-color:#DCF8C6; border-radius:15px; padding:10px; margin-bottom:5px; width:fit-content;">
+        <strong>You: </strong> 
+        {message}
+    </div>
+"""
+bot_message_style = """
+    <div style="background-color:#E8E8E8; border-radius:15px; padding:10px; margin-bottom:5px; width:fit-content;">
+        <strong>Bot: </strong>
+        {message}
+    </div>
+"""
+
+# Display chat history for the selected session
+for msg in chat_history:
     role = "🧑 You" if msg["role"] == "user" else "🤖 Bot"
     st.markdown(f"**{role}:** {msg['text']}")
 
@@ -59,8 +89,8 @@ if uploaded_file is not None:
             st.image(img, caption="📷 Uploaded Image", use_column_width=True)
             prompt = media_prompt if media_prompt else "Summarize the content of this image."
             response = model.generate_content([img, prompt])
-            st.session_state.chat_history.append({"role": "user", "text": f"[Image] {prompt}"})
-            st.session_state.chat_history.append({"role": "bot", "text": response.text})
+            chat_history.append({"role": "user", "text": f"[Image] {prompt}"})
+            chat_history.append({"role": "bot", "text": response.text})
         except Exception as e:
             st.error(f"Failed to analyze image: {e}")
 
@@ -88,8 +118,8 @@ if uploaded_file is not None:
             prompt = media_prompt if media_prompt else "Summarize this video."
             response = model.generate_content([blob, prompt])
 
-            st.session_state.chat_history.append({"role": "user", "text": f"[Video] {prompt}"})
-            st.session_state.chat_history.append({"role": "bot", "text": response.text})
+            chat_history.append({"role": "user", "text": f"[Video] {prompt}"})
+            chat_history.append({"role": "bot", "text": response.text})
 
             # ✅ Force rerun to refresh chat display
             st.rerun()
@@ -103,7 +133,7 @@ def handle_input():
     if user_input == "":
         return
 
-    st.session_state.chat_history.append({"role": "user", "text": user_input})
+    chat_history.append({"role": "user", "text": user_input})
 
     try:
         response = model.generate_content(user_input)
@@ -111,8 +141,11 @@ def handle_input():
     except Exception as e:
         bot_reply = f"❌ Error: {e}"
 
-    st.session_state.chat_history.append({"role": "bot", "text": bot_reply})
+    chat_history.append({"role": "bot", "text": bot_reply})
     st.session_state.chat_input = ""  # Clear input
+
+# Update session state with the latest chat history
+st.session_state.sessions[session_name] = chat_history
 
 # User input widget
 st.text_input("Ask me something...", key="chat_input", on_change=handle_input)
