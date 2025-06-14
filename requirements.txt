@@ -2,7 +2,10 @@ streamlit==1.45.1
 pillow==11.2.1
 mediapipe==0.10.21
 opencv-python==4.11.0.86
+python-dotenv
 elevenlabs==2.3.0
 numpy==1.26.4
 pandas==2.3.0
-jupyter==1.1.1
+google-generativeai
+protobuf==4.25.3
+# jupyter==1.1.1
