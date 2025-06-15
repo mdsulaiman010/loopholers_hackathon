@@ -87,8 +87,11 @@ with st.sidebar:
     tts_toggle = st.toggle("🔊 TTS", value=False)
     if tts_toggle:
         st.write("Text-to-speech enabled.")
+        # # Toggle button to switch to Webcam UI
+    if st.button("Switch to Chatbot"):
+        st.switch_page("chatbot.py")
     st.button("⏹️ Stop", key="stop", on_click=stop_recording)
-
+    
 # Two columns for camera and feedback
 col1, col2 = st.columns([7, 5])
 

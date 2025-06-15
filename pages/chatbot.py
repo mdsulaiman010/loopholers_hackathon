@@ -51,7 +51,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Configure your Gemini API key
-genai.configure(api_key=os.getenv("GEMINI_API_KEY")) 
+genai.configure(api_key=os.getenv("GEMINI_APIKEY")) 
 
 # ✅ Dropdown to choose model
 available_models = {
@@ -94,9 +94,6 @@ if session_name != "Create New Session" and st.sidebar.button("🗑️ Delete Th
     st.experimental_rerun()
 
 
-# # Toggle button to switch to Webcam UI
-if st.button("Switch to Live AI Analysis"):
-    st.switch_page("webcam_ui_bharathaan.py")
 
 # Create a new session
 if session_name == "Create New Session":
