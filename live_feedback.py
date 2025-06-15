@@ -109,9 +109,9 @@ with col1:
     with btn_col1:
         st.button("🔄 Reset Sampling", key="reset", on_click=reset_sampling)
     with btn_col2:
-        ai_toggle = st.toggle("🧠 AI Analysis", value=False)
+        ai_toggle = st.toggle("🧠 AI Analysis", value=True)
     with btn_col3:
-        selection_mode = st.toggle("🤖 AI Detection", value=True)
+        selection_mode = st.toggle("🤖 AI Detection", value=False)
     exercise_placeholder = st.empty()
     # Exercise selection buttons in a single row
     st.markdown("Select Exercise:", help="Click a button to manually select an exercise.")
@@ -243,21 +243,21 @@ def capture_and_process_video(frame_queue):
                     right_bottom = mapping_dict.get('right_bottom_zone')
 
                     # Debug zone detection
-                    print(f"Exercise: {current_exercise}, Left wrist: {left_wrist}, Left top: {left_top}, Left bottom: {left_bottom}")
-                    print(f"Right wrist: {right_wrist}, Right top: {right_top}, Right bottom: {right_bottom}")
+                    # print(f"Exercise: {current_exercise}, Left wrist: {left_wrist}, Left top: {left_top}, Left bottom: {left_bottom}")
+                    # print(f"Right wrist: {right_wrist}, Right top: {right_top}, Right bottom: {right_bottom}")
 
                     # Left arm logic
                     if left_wrist and left_bottom and left_top:
                         left_down = is_inside_zone(left_wrist, left_bottom)
                         left_up = is_inside_zone(left_wrist, left_top)
-                        print(f"Left down: {left_down}, Left up: {left_up}, Left stage: {left_stage}")
+                        # print(f"Left down: {left_down}, Left up: {left_up}, Left stage: {left_stage}")
                         if left_down and left_stage != 'down':
                             left_stage = 'down'
-                            print("Left arm: Down stage detected")
+                            # print("Left arm: Down stage detected")
                         elif left_stage == 'down' and left_up:
                             counter += 1
                             left_stage = 'up'
-                            print(f"Left arm: Rep {counter} completed")
+                            # print(f"Left arm: Rep {counter} completed")
                             if tts_toggle:
                                 threading.Thread(target=text_to_speech, args=(f"Rep {counter} completed!",), daemon=True).start()
 
@@ -265,21 +265,21 @@ def capture_and_process_video(frame_queue):
                     if right_wrist and right_bottom and right_top:
                         right_down = is_inside_zone(right_wrist, right_bottom)
                         right_up = is_inside_zone(right_wrist, right_top)
-                        print(f"Right down: {right_down}, Right up: {right_up}, Right stage: {right_stage}")
+                        # print(f"Right down: {right_down}, Right up: {right_up}, Right stage: {right_stage}")
                         if right_down and right_stage != 'down':
                             right_stage = 'down'
-                            print("Right arm: Down stage detected")
+                            # print("Right arm: Down stage detected")
                         elif right_stage == 'down' and right_up:
                             counter += 1
                             right_stage = 'up'
-                            print(f"Right arm: Rep {counter} completed")
+                            # print(f"Right arm: Rep {counter} completed")
                             if tts_toggle:
                                 threading.Thread(target=text_to_speech, args=(f"Rep {counter} completed!",), daemon=True).start()
 
                 # Display rep counter (always show, even if no landmarks)
                 cv2.putText(frame_rgb, f'Reps: {counter}', (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
-                print(f"Displayed Reps: {counter}")
+                # print(f"Displayed Reps: {counter}")
 
             except Exception as e:
                 print(f"Error processing landmarks: {e}")
@@ -368,7 +368,7 @@ def process_video_segment(file_path, display_name):
 
                 Ensure the response contains only the exercise name, with no additional text or formatting."""
             exercise = generate_content_from_video(video_file, exercise_prompt)
-            print(f"Detected exercise: '{exercise}'")
+            # print(f"Detected exercise: '{exercise}'")
             if exercise in exercise_functions:
                 current_exercise = exercise
                 last_exercise = exercise
