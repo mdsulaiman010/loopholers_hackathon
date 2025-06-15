@@ -1,6 +1,7 @@
 # Ignore .env files
 loopholers_env/
 .env
+.streamlit/
 
 # Ignore virtual environment files and directories
 pyvenv.cfg
