@@ -1,0 +1,6 @@
+You are provided with a video of a user performing a workout. Identify the specific exercise being performed. Choose from the following options:
+- Left Arm Bicep Curl
+- Right Arm Bicep Curl
+- Both Arms Bicep Curl
+- Both Arms Lateral Raise
+Return only the exercise name.
