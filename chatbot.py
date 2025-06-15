@@ -4,11 +4,51 @@ import google.generativeai as genai
 import os
 import io
 import time
+import pandas as pd
 from PIL import Image
+from datetime import datetime
 
 # Title
 st.set_page_config(page_title="AI Chatbot", layout="centered")
-st.title("Your Personal AI Chat")
+st.title("Your Personal Fitness AI Chat")
+st.markdown("""
+    <style>
+        /* Custom fonts and background */
+        body { background-color: #f7fafc; }
+        .main { background-color: #fff; border-radius: 16px; padding: 24px; box-shadow: 0 0 20px #e4e4e4; }
+        /* Chat bubbles */
+        .user-bubble {
+            background: #0074D9;
+            color: white;
+            border-radius: 18px 18px 4px 18px;
+            padding: 10px 16px;
+            margin: 6px 0 6px 40px;
+            max-width: 80%;
+            align-self: flex-end;
+        }
+        .bot-bubble {
+            background: #e2e8f0;
+            color: #222;
+            border-radius: 18px 18px 18px 4px;
+            padding: 10px 16px;
+            margin: 6px 40px 6px 0;
+            max-width: 80%;
+            align-self: flex-start;
+        }
+        .sidebar-user {
+            text-align:center;
+            margin-top:24px;
+        }
+        .sidebar-user img {
+            border-radius:50%;
+            width:80px;
+            margin-bottom:8px;
+        }
+        .sidebar-user h4 {
+            margin:0;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 # Configure your Gemini API key
 genai.configure(api_key=os.getenv("GEMINI_API_KEY")) 
@@ -39,6 +79,24 @@ if 'sessions' not in st.session_state:
     st.session_state.sessions = {}
 
 session_name = st.sidebar.selectbox("Select a chat session", list(st.session_state.sessions.keys()) + ["Create New Session"])
+with st.sidebar:
+    st.markdown("""
+    <div class="sidebar-user">
+        <img src="https://ui-avatars.com/api/?name=AI+User&background=0074D9&color=fff" />
+        <h4>Welcome!</h4>
+        <p style='font-size:13px'>Your sessions are listed below.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+if session_name != "Create New Session" and st.sidebar.button("🗑️ Delete This Session"):
+    del st.session_state.sessions[session_name]
+    st.sidebar.success(f"Session '{session_name}' deleted.")
+    st.experimental_rerun()
+
+
+# # Toggle button to switch to Webcam UI
+if st.button("Switch to Live AI Analysis"):
+    st.switch_page("webcam_ui_bharathaan.py")
 
 # Create a new session
 if session_name == "Create New Session":
@@ -69,14 +127,26 @@ bot_message_style = """
 """
 
 # Display chat history for the selected session
+# for msg in chat_history:
+#     role = "🧑 You" if msg["role"] == "user" else "🤖 Bot"
+#     st.markdown(f"**{role}:** {msg['text']}")
+st.markdown("<div style='display:flex; flex-direction:column;'>", unsafe_allow_html=True)
 for msg in chat_history:
-    role = "🧑 You" if msg["role"] == "user" else "🤖 Bot"
-    st.markdown(f"**{role}:** {msg['text']}")
+    time = msg.get("time", "")
+    if msg["role"] == "user":
+        st.markdown(f"<div class='user-bubble'>{msg['text']} <span style='font-size:11px;float:right;'>{time}</span></div>", unsafe_allow_html=True)
+    else:
+        st.markdown(f"<div class='bot-bubble'>{msg['text']} <span style='font-size:11px;float:right;'>{time}</span></div>", unsafe_allow_html=True)
 
 # Upload Section (Image or Video)
 st.divider()
-uploaded_file = st.file_uploader("📎 Upload an image or video", type=["jpg", "jpeg", "png", "mp4"])
-media_prompt = st.text_input("Optional prompt to guide Gemini (e.g. 'Summarize this video')", key="media_prompt")
+# uploaded_file = st.file_uploader("📎 Upload an image or video", type=["jpg", "jpeg", "png", "mp4"])
+# media_prompt = st.text_input("Optional prompt to guide Gemini (e.g. 'Summarize this video')", key="media_prompt")
+col1, col2 = st.columns([2, 3])
+with col1:
+    uploaded_file = st.file_uploader("📎 Upload image/video", type=["jpg", "jpeg", "png", "mp4"])
+with col2:
+    media_prompt = st.text_input("Prompt for uploaded media", key="media_prompt", placeholder="E.g. 'Summarize this video'")
 
 if uploaded_file is not None:
     file_type = uploaded_file.type
@@ -132,8 +202,9 @@ def handle_input():
     user_input = st.session_state.chat_input.strip()
     if user_input == "":
         return
-
-    chat_history.append({"role": "user", "text": user_input})
+    
+    timestamp = datetime.now().strftime("%H:%M")
+    chat_history.append({"role": "user", "text": user_input, "time": timestamp})
 
     try:
         response = model.generate_content(user_input)
@@ -141,11 +212,19 @@ def handle_input():
     except Exception as e:
         bot_reply = f"❌ Error: {e}"
 
-    chat_history.append({"role": "bot", "text": bot_reply})
+    chat_history.append({"role": "bot", "text": bot_reply, "time": timestamp})
     st.session_state.chat_input = ""  # Clear input
 
 # Update session state with the latest chat history
 st.session_state.sessions[session_name] = chat_history
 
+if len(chat_history) > 0:
+    chat_text = "\n".join(
+        [f"You: {msg['text']}" if msg["role"] == "user" else f"Bot: {msg['text']}" for msg in chat_history]
+    )
+    st.download_button("💾 Download Chat", chat_text, file_name=f"{session_name}.txt")
+
 # User input widget
-st.text_input("Ask me something...", key="chat_input", on_change=handle_input)
+st.markdown("---")
+st.text_input("Type your message and press Enter", key="chat_input", on_change=handle_input, placeholder="Ask me anything...", label_visibility="collapsed")
+
