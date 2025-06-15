@@ -11,6 +11,9 @@ from elevenlabs.client import ElevenLabs
 from elevenlabs import play
 import threading
 import queue
+import io
+import uuid
+
 from utilities import upload_and_process_video, generate_content_from_video, calculate_angle, calculate_distance, is_inside_zone, left_arm_bicep_curl, right_arm_bicep_curl, both_arms_bicep_curl, both_arms_lateral_raise
 
 # Set wide layout to maximize space
@@ -43,6 +46,9 @@ right_stage = None  # Right arm stage (None, "up", "down")
 current_exercise = "Left Arm Bicep Curl"  # Default exercise
 last_exercise = current_exercise  # Track last valid exercise
 
+# Lock for video writer access
+video_writer_lock = threading.Lock()
+
 # Exercise function mapping
 exercise_functions = {
     "Left Arm Bicep Curl": left_arm_bicep_curl,
@@ -66,9 +72,10 @@ def reset_sampling():
     counter = 0
     left_stage = None
     right_stage = None
-    if video_writer:
-        video_writer.release()
-        video_writer = None
+    with video_writer_lock:
+        if video_writer:
+            video_writer.release()
+            video_writer = None
     processing_started_at = None
 
 # Function to set exercise
@@ -87,11 +94,10 @@ with st.sidebar:
     tts_toggle = st.toggle("🔊 TTS", value=False)
     if tts_toggle:
         st.write("Text-to-speech enabled.")
-        # # Toggle button to switch to Webcam UI
     if st.button("Switch to Chatbot"):
         st.switch_page("chatbot.py")
     st.button("⏹️ Stop", key="stop", on_click=stop_recording)
-    
+
 # Two columns for camera and feedback
 col1, col2 = st.columns([7, 5])
 
@@ -135,25 +141,37 @@ with col2:
 def safe_delete_file(file_path, max_attempts=5, delay=1):
     for attempt in range(max_attempts):
         try:
-            os.remove(file_path)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"Deleted file: {file_path}")
+                return True
             return True
-        except PermissionError:
+        except (PermissionError, OSError):
             time.sleep(delay)
     st.error(f"Failed to delete temporary file {file_path} after {max_attempts} attempts.")
+    print(f"Failed to delete file: {file_path}")
     return False
 
 def text_to_speech(text):
     try:
+        print(f"TTS processing text: {text}")
         client = ElevenLabs(api_key=elevenlabs_apikey)
-        audio = client.text_to_speech.convert(
+        audio_stream = client.generate(
             text=text,
-            voice_id="JBFqnCBsd6RMkjVDRZzb",
-            model_id="eleven_multilingual_v2",
+            voice="JBFqnCBsd6RMkjVDRZzb",
+            model="eleven_multilingual_v2",
             output_format="mp3_44100_128"
         )
-        play(audio)
+        # Convert generator to bytes
+        audio_bytes = b''.join(audio_stream)
+        print(f"TTS audio generated, size: {len(audio_bytes)} bytes")
+        # Play audio using BytesIO
+        audio_io = io.BytesIO(audio_bytes)
+        play(audio_io)
+        print("TTS audio played successfully")
     except Exception as e:
         st.error(f"Error in TTS: {e}")
+        print(f"TTS error: {e}")
 
 # Function to capture and process video segments
 def capture_and_process_video(frame_queue):
@@ -183,19 +201,23 @@ def capture_and_process_video(frame_queue):
             rgb_frame.flags.writeable = True
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-            if frame_count == 0 and ai_toggle and not processing_status:
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4', dir=temp_dir)
-                video_writer = cv2.VideoWriter(temp_file.name, fourcc, frame_rate, (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))))
-                print(f"Starting new video segment: {temp_file.name}")
+            with video_writer_lock:
+                if frame_count == 0 and ai_toggle and not processing_status:
+                    unique_id = str(uuid.uuid4())
+                    temp_file_path = os.path.join(temp_dir, f"video_{unique_id}.mp4")
+                    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4', dir=temp_dir) as temp_file:
+                        temp_file_path = temp_file.name
+                    video_writer = cv2.VideoWriter(temp_file_path, fourcc, frame_rate, (int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))))
+                    print(f"Starting new video segment: {temp_file_path}")
 
-            if video_writer and ai_toggle and not processing_status:
-                video_writer.write(frame)
-                frame_count += 1
-            elif video_writer and (not ai_toggle or processing_status):
-                video_writer.release()
-                video_writer = None
-                frame_count = 0
-                print("Stopped recording segment (AI toggle off or processing started).")
+                if video_writer and ai_toggle and not processing_status:
+                    video_writer.write(frame)
+                    frame_count += 1
+                elif video_writer and (not ai_toggle or processing_status):
+                    video_writer.release()
+                    video_writer = None
+                    frame_count = 0
+                    print("Stopped recording segment (AI toggle off or processing started).")
 
             # Process landmarks
             try:
@@ -265,16 +287,18 @@ def capture_and_process_video(frame_queue):
                 pass
 
             if (ai_toggle and not processing_status and (time.time() - segment_start_time) >= segment_duration) or reset_flag:
-                if video_writer:
-                    video_writer.release()
-                    video_writer = None
+                with video_writer_lock:
+                    if video_writer:
+                        video_writer.release()
+                        video_writer = None
+                        temp_file_path_local = temp_file_path
 
                 if ai_toggle and not reset_flag:
                     processing_started_at = time.time()
-                    threading.Thread(target=process_video_segment, args=(temp_file.name, f"segment_{int(time.time())}",), daemon=True).start()
+                    threading.Thread(target=process_video_segment, args=(temp_file_path_local, f"segment_{int(time.time())}",), daemon=True).start()
                 else:
-                    if 'temp_file' in locals() and os.path.exists(temp_file.name):
-                        safe_delete_file(temp_file.name)
+                    if 'temp_file_path_local' in locals() and os.path.exists(temp_file_path_local):
+                        safe_delete_file(temp_file_path_local)
 
                 frame_count = 0
                 segment_start_time = time.time()
@@ -283,15 +307,24 @@ def capture_and_process_video(frame_queue):
             time.sleep(0.05)
 
     cap.release()
-    if video_writer:
-        video_writer.release()
+    with video_writer_lock:
+        if video_writer:
+            video_writer.release()
     print("Webcam and video writer released. Thread terminated.")
 
 # Function to process video segment and get feedback
 def process_video_segment(file_path, display_name):
     global processing_status, processing_started_at, current_exercise, last_exercise
     processing_status = True
-    print(f"AI processing started for {display_name}")
+    print(f"AI processing started for {display_name}: {file_path}")
+
+    # Verify file is an MP4
+    if not file_path.endswith('.mp4') or not os.path.exists(file_path):
+        st.error(f"Invalid video file: {file_path}")
+        print(f"Invalid video file: {file_path}")
+        processing_status = False
+        processing_started_at = None
+        return
 
     video_file = upload_and_process_video(file_path, display_name)
     if video_file:
@@ -315,7 +348,7 @@ def process_video_segment(file_path, display_name):
                 with open('exercise_detection_prompt.txt', 'r') as f:
                     exercise_prompt = f.read()
             except FileNotFoundError:
-                exercise_prompt = """You are provided with a 30-second video of a user performing a workout. Identify the specific exercise by analyzing arm movements and body posture. Choose exactly one exercise from the following options, returning only the exercise name:
+                exercise_prompt = """You are provided with a 20-second video of a user performing a workout. Identify the specific exercise by analyzing arm movements and body posture. Choose exactly one exercise from the following options, returning only the exercise name:
 
                 - Left Arm Bicep Curl: The left arm bends at the elbow, moving the hand toward the shoulder, while the right arm remains relatively stationary.
                 - Right Arm Bicep Curl: The right arm bends at the elbow, moving the hand toward the shoulder, while the left arm remains relatively stationary.
@@ -324,7 +357,7 @@ def process_video_segment(file_path, display_name):
 
                 Ensure the response contains only the exercise name, with no additional text or formatting."""
             exercise = generate_content_from_video(video_file, exercise_prompt)
-            print(f"Detected exercise: {exercise}")  # Debug print
+            print(f"Detected exercise: '{exercise}'")  # Enhanced debug print
             if exercise in exercise_functions:
                 current_exercise = exercise
                 last_exercise = exercise
