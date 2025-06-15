@@ -2,6 +2,7 @@ import google.generativeai as genai
 import cv2
 import numpy as np
 from math import degrees, acos
+import mediapipe as mp
 
 def upload_and_process_video(file_path, display_name):
     """

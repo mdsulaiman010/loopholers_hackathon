@@ -221,57 +221,68 @@ def capture_and_process_video(frame_queue):
 
             # Process landmarks
             try:
-                landmarks = results.pose_landmarks.landmark
-                left_shoulder = [landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x,
-                                 landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].y]
-                left_elbow = [landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].x,
-                              landmarks[mp_pose.PoseLandmark.LEFT_ELBOW.value].y]
-                left_wrist = [landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].x,
-                              landmarks[mp_pose.PoseLandmark.LEFT_WRIST.value].y]
-                h, w, _ = frame.shape
-                angle = calculate_angle(left_shoulder, left_elbow, left_wrist)
-                cv2.putText(frame_rgb, f'Angle: {angle:.1f}', tuple(np.multiply(left_elbow, [w, h]).astype(int)),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
+                if results.pose_landmarks:
+                    landmarks = results.pose_landmarks.landmark
+                    # Use direct indices instead of mp_pose.PoseLandmark
+                    left_shoulder = [landmarks[11].x, landmarks[11].y]  # LEFT_SHOULDER
+                    left_elbow = [landmarks[13].x, landmarks[13].y]     # LEFT_ELBOW
+                    left_wrist = [landmarks[15].x, landmarks[15].y]     # LEFT_WRIST
+                    h, w, _ = frame.shape
+                    angle = calculate_angle(left_shoulder, left_elbow, left_wrist)
+                    cv2.putText(frame_rgb, f'Angle: {angle:.1f}', tuple(np.multiply(left_elbow, [w, h]).astype(int)),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2, cv2.LINE_AA)
 
-                # Rep counting
-                selected_function = exercise_functions.get(current_exercise, left_arm_bicep_curl)
-                mapping_dict = selected_function(landmarks, frame_rgb, h, w)
-                left_wrist = mapping_dict.get('left_wrist')
-                right_wrist = mapping_dict.get('right_wrist')
-                left_top = mapping_dict.get('left_top_zone')
-                right_top = mapping_dict.get('right_top_zone')
-                left_bottom = mapping_dict.get('left_bottom_zone')
-                right_bottom = mapping_dict.get('right_bottom_zone')
+                    # Rep counting
+                    selected_function = exercise_functions.get(current_exercise, left_arm_bicep_curl)
+                    mapping_dict = selected_function(landmarks, frame_rgb, h, w)
+                    left_wrist = mapping_dict.get('left_wrist')
+                    right_wrist = mapping_dict.get('right_wrist')
+                    left_top = mapping_dict.get('left_top_zone')
+                    right_top = mapping_dict.get('right_top_zone')
+                    left_bottom = mapping_dict.get('left_bottom_zone')
+                    right_bottom = mapping_dict.get('right_bottom_zone')
 
-                # Left arm logic
-                if left_wrist and left_bottom and left_top:
-                    left_down = is_inside_zone(left_wrist, left_bottom)
-                    left_up = is_inside_zone(left_wrist, left_top)
-                    if left_down and left_stage != 'down':
-                        left_stage = 'down'
-                    elif left_stage == 'down' and left_up:
-                        counter += 1
-                        left_stage = 'up'
-                        if tts_toggle:
-                            threading.Thread(target=text_to_speech, args=(f"Rep {counter} completed!",), daemon=True).start()
+                    # Debug zone detection
+                    print(f"Exercise: {current_exercise}, Left wrist: {left_wrist}, Left top: {left_top}, Left bottom: {left_bottom}")
+                    print(f"Right wrist: {right_wrist}, Right top: {right_top}, Right bottom: {right_bottom}")
 
-                # Right arm logic
-                if right_wrist and right_bottom and right_top:
-                    right_down = is_inside_zone(right_wrist, right_bottom)
-                    right_up = is_inside_zone(right_wrist, right_top)
-                    if right_down and right_stage != 'down':
-                        right_stage = 'down'
-                    elif right_stage == 'down' and right_up:
-                        counter += 1
-                        right_stage = 'up'
-                        if tts_toggle:
-                            threading.Thread(target=text_to_speech, args=(f"Rep {counter} completed!",), daemon=True).start()
+                    # Left arm logic
+                    if left_wrist and left_bottom and left_top:
+                        left_down = is_inside_zone(left_wrist, left_bottom)
+                        left_up = is_inside_zone(left_wrist, left_top)
+                        print(f"Left down: {left_down}, Left up: {left_up}, Left stage: {left_stage}")
+                        if left_down and left_stage != 'down':
+                            left_stage = 'down'
+                            print("Left arm: Down stage detected")
+                        elif left_stage == 'down' and left_up:
+                            counter += 1
+                            left_stage = 'up'
+                            print(f"Left arm: Rep {counter} completed")
+                            if tts_toggle:
+                                threading.Thread(target=text_to_speech, args=(f"Rep {counter} completed!",), daemon=True).start()
 
+                    # Right arm logic
+                    if right_wrist and right_bottom and right_top:
+                        right_down = is_inside_zone(right_wrist, right_bottom)
+                        right_up = is_inside_zone(right_wrist, right_top)
+                        print(f"Right down: {right_down}, Right up: {right_up}, Right stage: {right_stage}")
+                        if right_down and right_stage != 'down':
+                            right_stage = 'down'
+                            print("Right arm: Down stage detected")
+                        elif right_stage == 'down' and right_up:
+                            counter += 1
+                            right_stage = 'up'
+                            print(f"Right arm: Rep {counter} completed")
+                            if tts_toggle:
+                                threading.Thread(target=text_to_speech, args=(f"Rep {counter} completed!",), daemon=True).start()
+
+                # Display rep counter (always show, even if no landmarks)
                 cv2.putText(frame_rgb, f'Reps: {counter}', (10, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2, cv2.LINE_AA)
+                print(f"Displayed Reps: {counter}")
 
             except Exception as e:
-                pass
+                print(f"Error processing landmarks: {e}")
 
             mp_drawing.draw_landmarks(
                 frame_rgb,
@@ -357,7 +368,7 @@ def process_video_segment(file_path, display_name):
 
                 Ensure the response contains only the exercise name, with no additional text or formatting."""
             exercise = generate_content_from_video(video_file, exercise_prompt)
-            print(f"Detected exercise: '{exercise}'")  # Enhanced debug print
+            print(f"Detected exercise: '{exercise}'")
             if exercise in exercise_functions:
                 current_exercise = exercise
                 last_exercise = exercise
